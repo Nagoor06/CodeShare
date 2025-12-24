@@ -1,0 +1,22 @@
+{
+  "name": "codeshare-backend",
+  "version": "1.0.0",
+  "description": "Secure code-based file and text sharing backend",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "Nagoor Veeraboina",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "mongoose": "^8.5.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
+    "cloudinary": "^2.8.0",
+    "multer": "^1.4.5-lts.1",
+    "crypto-js": "^4.2.0"
+  }
+}
