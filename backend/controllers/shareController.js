@@ -52,3 +52,15 @@ export const createShare = async (req, res) => {
     });
   }
 };
+
+export const deleteFile = async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ success: false });
+
+  await Share.findOneAndUpdate(
+    { codeHash: hashCode(code) },
+    { $unset: { fileUrl: "" } }
+  );
+
+  res.json({ success: true });
+};
