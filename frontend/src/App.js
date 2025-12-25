@@ -1,16 +1,16 @@
 import { Routes, Route } from "react-router-dom";
-import CodePage from "./pages/CodePage";
-import ActionPage from "./pages/ActionPage";
-import SharePage from "./pages/SharePage";
-import OpenPage from "./pages/OpenPage";
+import Home from "./pages/Home";
+import Choose from "./pages/Choose";
+import TextEditor from "./pages/TextEditor";
+import FileUpload from "./pages/FileUpload";
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<CodePage />} />
-      <Route path="/action" element={<ActionPage />} />
-      <Route path="/share" element={<SharePage />} />
-      <Route path="/open" element={<OpenPage />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/choose" element={<Choose />} />
+      <Route path="/text" element={<TextEditor />} />
+      <Route path="/file" element={<FileUpload />} />
     </Routes>
   );
 }
