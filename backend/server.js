@@ -13,6 +13,6 @@ app.use(express.json({ limit: "2mb" }));
 
 app.use("/api/share", shareRoutes);
 
-app.listen(process.env.PORT || 5000, () =>
-  console.log("Backend running")
+app.listen(process.env.PORT, () =>
+  console.log("Backend running on port", process.env.PORT)
 );
