@@ -7,5 +7,6 @@ const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.post("/", upload.single("file"), createShare);
 router.post("/open", openShare);
+router.post("/delete-file", deleteFile);
 
 export default router;
