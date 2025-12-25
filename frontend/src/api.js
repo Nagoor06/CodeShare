@@ -1,5 +1,7 @@
 import axios from "axios";
 
-export default axios.create({
-  baseURL: "https://codeshare-qiiv.onrender.com"
+const api = axios.create({
+  baseURL: "https://codeshare-qiiv.onrender.com/api",
 });
+
+export default api;
