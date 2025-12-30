@@ -1,12 +1,23 @@
-import express from "express";
 import multer from "multer";
-import { createShare, openShare } from "../controllers/shareController.js";
 
-const router = express.Router();
-const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "text/plain",
+];
 
-router.post("/", upload.single("file"), createShare);
-router.post("/open", openShare);
-router.post("/delete-file", deleteFile);
-
-export default router;
+const upload = multer({
+  storage: multer.memoryStorage(), // 🔥 REQUIRED for GridFS
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      return cb(
+        new Error("Invalid file type. Only PDF, images, and text files allowed.")
+      );
+    }
+    cb(null, true);
+  },
+});

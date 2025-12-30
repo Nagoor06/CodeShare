@@ -1,156 +1,94 @@
 import Share from "../models/Share.js";
-import cloudinary from "../config/cloudinary.js";
 import { encrypt, decrypt } from "../utils/crypto.js";
 import { hashCode } from "../utils/hash.js";
+import { getGFS } from "../config/db.js";
+import mongoose from "mongoose";
 
-/**
- * CREATE or UPDATE (UPSERT)
- * - Saves text and/or file for a given code
- * - One record per code
- */
+/* SAVE TEXT OR FILE */
 export const createShare = async (req, res) => {
   try {
     const { code, text } = req.body;
+    if (!code) return res.status(400).json({ success: false });
 
-    if (!code) {
-      return res.status(400).json({
-        success: false,
-        message: "Code is required",
-      });
-    }
+    let fileId, fileName, fileType;
 
-    let fileUrl;
-    let fileName;
-    let fileType;
-
-    // ✅ SAFE Cloudinary upload (NO corruption)
+    // ✅ STORE FILE IN GRIDFS (NO CORRUPTION)
     if (req.file) {
+      const gfs = getGFS();
+
       fileName = req.file.originalname;
       fileType = req.file.mimetype;
 
-      const uploadResult = await new Promise((resolve, reject) => {
-        const stream = cloudinary.v2.uploader.upload_stream(
-          {
-            resource_type: "auto",     // 🔥 auto-detect pdf/image/etc
-            use_filename: true,
-            unique_filename: true,
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        stream.end(req.file.buffer);
+      const uploadStream = gfs.openUploadStream(fileName, {
+        contentType: fileType,
       });
 
-      fileUrl = uploadResult.secure_url;
-    }
+      uploadStream.end(req.file.buffer);
 
-    // ✅ UPSERT (update if exists, else create)
-    const saved = await Share.findOneAndUpdate(
-      { codeHash: hashCode(code) },
-      {
-        encryptedText:
-          typeof text === "string" ? encrypt(text, code) : undefined,
-        fileUrl: fileUrl || undefined,
-        fileName: fileName || undefined,
-        fileType: fileType || undefined,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hrs
-      },
-      { upsert: true, new: true }
-    );
-
-    // 🔥 ALWAYS return a response
-    return res.json({
-      success: true,
-      hasText: !!saved.encryptedText,
-      hasFile: !!saved.fileUrl,
-    });
-  } catch (error) {
-    console.error("CREATE SHARE ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Save failed",
-    });
-  }
-};
-
-/**
- * OPEN / FETCH
- * - Loads saved text or file for the code
- * - Never throws 404 (frontend-safe)
- */
-export const openShare = async (req, res) => {
-  try {
-    const { code } = req.body;
-
-    if (!code) {
-      return res.status(400).json({
-        success: false,
-        message: "Code is required",
+      await new Promise((resolve, reject) => {
+        uploadStream.on("finish", resolve);
+        uploadStream.on("error", reject);
       });
-    }
 
-    const share = await Share.findOne({
-      codeHash: hashCode(code),
-    });
-
-    // ✅ No data yet → return empty but valid response
-    if (!share) {
-      return res.json({
-        text: "",
-        fileUrl: null,
-        fileName: null,
-        fileType: null,
-      });
-    }
-
-    return res.json({
-      text: share.encryptedText
-        ? decrypt(share.encryptedText, code)
-        : "",
-      fileUrl: share.fileUrl || null,
-      fileName: share.fileName || null,
-      fileType: share.fileType || null,
-    });
-  } catch (error) {
-    console.error("OPEN SHARE ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Open failed",
-    });
-  }
-};
-
-/**
- * DELETE FILE ONLY (OPTIONAL FEATURE)
- * - Keeps text, removes file
- */
-export const deleteFile = async (req, res) => {
-  try {
-    const { code } = req.body;
-
-    if (!code) {
-      return res.status(400).json({ success: false });
+      fileId = uploadStream.id;
     }
 
     await Share.findOneAndUpdate(
       { codeHash: hashCode(code) },
       {
-        $unset: {
-          fileUrl: "",
-          fileName: "",
-          fileType: "",
-        },
-      }
+        encryptedText: typeof text === "string" ? encrypt(text, code) : undefined,
+        fileId,
+        fileName,
+        fileType,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+      { upsert: true, new: true }
     );
 
-    return res.json({ success: true });
-  } catch (error) {
-    console.error("DELETE FILE ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Delete failed",
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+};
+
+/* OPEN METADATA */
+export const openShare = async (req, res) => {
+  const { code } = req.body;
+
+  const share = await Share.findOne({ codeHash: hashCode(code) });
+
+  if (!share) {
+    return res.json({
+      text: "",
+      hasFile: false,
     });
   }
+
+  res.json({
+    text: share.encryptedText ? decrypt(share.encryptedText, code) : "",
+    hasFile: !!share.fileId,
+    fileName: share.fileName,
+    fileType: share.fileType,
+    fileId: share.fileId,
+  });
+};
+
+/* DOWNLOAD FILE (STREAM) */
+export const downloadFile = async (req, res) => {
+  const { fileId } = req.params;
+  const gfs = getGFS();
+
+  const _id = new mongoose.Types.ObjectId(fileId);
+
+  const files = await gfs.find({ _id }).toArray();
+  if (!files.length) return res.sendStatus(404);
+
+  res.set("Content-Type", files[0].contentType);
+  res.set(
+    "Content-Disposition",
+    `attachment; filename="${files[0].filename}"`
+  );
+
+  gfs.openDownloadStream(_id).pipe(res);
 };

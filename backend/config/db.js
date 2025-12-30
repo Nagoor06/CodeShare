@@ -1,8 +1,16 @@
 import mongoose from "mongoose";
+import { GridFSBucket } from "mongodb";
 
-const connectDB = async () => {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log("MongoDB connected");
+let gfsBucket;
+
+export const connectDB = async () => {
+  const conn = await mongoose.connect(process.env.MONGO_URI);
+
+  gfsBucket = new GridFSBucket(conn.connection.db, {
+    bucketName: "files",
+  });
+
+  console.log("MongoDB + GridFS connected");
 };
 
-export default connectDB;
+export const getGFS = () => gfsBucket;
